@@ -26,6 +26,14 @@ export class App implements AfterViewInit {
   cycleLength: number = 0;
   cycleDetected: boolean = false;
   
+  // Validation test results
+  validationResults = {
+    independenceTest: { passed: false, correlation: 0, threshold: 0.05 },
+    uniformityTest: { passed: false, chiSquare: 0, criticalValue: 0, degreesOfFreedom: 0 },
+    overallValid: false
+  };
+  testsPerformed: boolean = false;
+  
   @ViewChild('scatterChart', { static: false }) scatterChartRef!: ElementRef<HTMLCanvasElement>;
   private chart?: Chart;
 
@@ -121,6 +129,7 @@ export class App implements AfterViewInit {
       // Update the scatter chart after Angular renders the canvas
       setTimeout(() => {
         this.updateChart();
+        this.performValidationTests();
       }, 0);
 
     } catch (err: any) {
@@ -134,6 +143,12 @@ export class App implements AfterViewInit {
     this.errorMessage = '';
     this.cycleDetected = false;
     this.cycleLength = 0;
+    this.testsPerformed = false;
+    this.validationResults = {
+      independenceTest: { passed: false, correlation: 0, threshold: 0.05 },
+      uniformityTest: { passed: false, chiSquare: 0, criticalValue: 0, degreesOfFreedom: 0 },
+      overallValid: false
+    };
     
     // Destroy chart if exists
     if (this.chart) {
@@ -229,5 +244,140 @@ export class App implements AfterViewInit {
         }
       }
     });
+  }
+
+  /**
+   * Perform validation tests on the generated numbers
+   */
+  performValidationTests() {
+    this.testsPerformed = true;
+    
+    // Test 1: Independence Test (Correlation)
+    this.validationResults.independenceTest = this.independenceTest();
+    
+    // Test 2: Uniformity Test (Chi-Square)
+    this.validationResults.uniformityTest = this.uniformityTest();
+    
+    // Overall validation
+    this.validationResults.overallValid = 
+      this.validationResults.independenceTest.passed && 
+      this.validationResults.uniformityTest.passed;
+  }
+
+  /**
+   * Independence Test: Check for correlation between consecutive numbers
+   * Uses Pearson correlation coefficient
+   */
+  independenceTest(): { passed: boolean, correlation: number, threshold: number } {
+    const threshold = 0.05; // Correlation should be close to 0 (< 0.05 is good)
+    
+    if (this.results.length < 2) {
+      return { passed: false, correlation: 0, threshold };
+    }
+
+    // Calculate correlation between consecutive normalized values
+    const values = this.results.map(r => r.normalized);
+    const n = values.length - 1;
+    
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+    
+    for (let i = 0; i < n; i++) {
+      const x = values[i];
+      const y = values[i + 1];
+      
+      sumX += x;
+      sumY += y;
+      sumXY += x * y;
+      sumX2 += x * x;
+      sumY2 += y * y;
+    }
+    
+    const meanX = sumX / n;
+    const meanY = sumY / n;
+    
+    const numerator = sumXY - n * meanX * meanY;
+    const denominator = Math.sqrt((sumX2 - n * meanX * meanX) * (sumY2 - n * meanY * meanY));
+    
+    const correlation = denominator === 0 ? 0 : Math.abs(numerator / denominator);
+    
+    return {
+      passed: correlation < threshold,
+      correlation: correlation,
+      threshold: threshold
+    };
+  }
+
+  /**
+   * Uniformity Test: Chi-Square test
+   * Divides [0,1] into k intervals and checks if distribution is uniform
+   */
+  uniformityTest(): { passed: boolean, chiSquare: number, criticalValue: number, degreesOfFreedom: number } {
+    const k = Math.min(20, Math.floor(Math.sqrt(this.results.length))); // Number of intervals
+    const alpha = 0.05; // Significance level
+    const degreesOfFreedom = k - 1;
+    
+    // Chi-square critical values table for alpha = 0.05
+    const chiSquareCritical = this.getChiSquareCriticalValue(degreesOfFreedom, alpha);
+    
+    // Count frequencies in each interval
+    const observed = new Array(k).fill(0);
+    const expected = this.results.length / k;
+    
+    for (const result of this.results) {
+      const intervalIndex = Math.min(Math.floor(result.normalized * k), k - 1);
+      observed[intervalIndex]++;
+    }
+    
+    // Calculate chi-square statistic
+    let chiSquare = 0;
+    for (let i = 0; i < k; i++) {
+      chiSquare += Math.pow(observed[i] - expected, 2) / expected;
+    }
+    
+    return {
+      passed: chiSquare < chiSquareCritical,
+      chiSquare: chiSquare,
+      criticalValue: chiSquareCritical,
+      degreesOfFreedom: degreesOfFreedom
+    };
+  }
+
+  /**
+   * Get Chi-Square critical value for given degrees of freedom and alpha
+   */
+  getChiSquareCriticalValue(df: number, alpha: number): number {
+    // Chi-square critical values table for alpha = 0.05
+    const chiSquareTable: { [key: number]: number } = {
+      1: 3.841, 2: 5.991, 3: 7.815, 4: 9.488, 5: 11.070,
+      6: 12.592, 7: 14.067, 8: 15.507, 9: 16.919, 10: 18.307,
+      11: 19.675, 12: 21.026, 13: 22.362, 14: 23.685, 15: 24.996,
+      16: 26.296, 17: 27.587, 18: 28.869, 19: 30.144, 20: 31.410,
+      25: 37.652, 30: 43.773, 40: 55.758, 50: 67.505, 60: 79.082,
+      70: 90.531, 80: 101.879, 90: 113.145, 100: 124.342
+    };
+    
+    if (chiSquareTable[df]) {
+      return chiSquareTable[df];
+    }
+    
+    // Approximation for large df
+    return df + Math.sqrt(2 * df) * 1.645; // Using normal approximation
+  }
+
+  /**
+   * Regenerate numbers with adjusted parameters
+   */
+  regenerate() {
+    // Strategy: Try to find better parameters
+    // Option 1: Increase the seed
+    const currentX0 = parseInt(this.form.value.X0);
+    const newX0 = (currentX0 + 137) % this.m; // Add prime number and wrap
+    
+    this.form.patchValue({
+      X0: newX0
+    });
+    
+    // Generate again
+    this.generate();
   }
 }
