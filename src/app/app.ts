@@ -45,7 +45,7 @@ export class App implements AfterViewInit {
       c: ['', [Validators.required, Validators.min(0)]],
       X0: ['', [Validators.required, Validators.min(0)]],
       N: ['', [Validators.required, Validators.min(1), Validators.max(100000)]],
-      alpha: [0.05, [Validators.required]] // Campo para nivel de confianza
+      alpha: [95, [Validators.required, Validators.min(80), Validators.max(99.9)]] // Porcentaje de confianza
     });
 
     // Cuando cambia g, actualizar N automáticamente
@@ -74,16 +74,19 @@ export class App implements AfterViewInit {
       this.c = parseInt(this.form.value.c);
       this.X0 = parseInt(this.form.value.X0);
       this.N = parseInt(this.form.value.N);
-      this.selectedAlpha = parseFloat(this.form.value.alpha);
+      
+      // Convertir porcentaje de confianza a alpha (nivel de significancia)
+      const confidencePercent = parseFloat(this.form.value.alpha);
+      this.selectedAlpha = (100 - confidencePercent) / 100;
 
       // Validar que sean números enteros
       if (isNaN(this.g) || isNaN(this.a) || isNaN(this.c) || isNaN(this.X0) || isNaN(this.N)) {
         throw new Error('Todos los campos deben ser números enteros.');
       }
       
-      // Validar alpha
-      if (isNaN(this.selectedAlpha) || this.selectedAlpha <= 0 || this.selectedAlpha >= 1) {
-        throw new Error('El nivel de significancia debe estar entre 0 y 1.');
+      // Validar nivel de confianza
+      if (isNaN(confidencePercent) || confidencePercent < 80 || confidencePercent > 99.9) {
+        throw new Error('El nivel de confianza debe estar entre 80 y 99.9%.');
       }
 
       // Validar g
@@ -374,6 +377,13 @@ export class App implements AfterViewInit {
   getChiSquareCriticalValue(df: number, alpha: number): number {
     // Chi-square critical values tables for different alpha levels
     const chiSquareTables: { [key: number]: { [key: number]: number } } = {
+      // Alpha = 0.001 (99.9% confidence)
+      0.001: {
+        1: 10.828, 2: 13.816, 3: 16.266, 4: 18.467, 5: 20.515,
+        6: 22.458, 7: 24.322, 8: 26.125, 9: 27.877, 10: 29.588,
+        11: 31.264, 12: 32.910, 13: 34.528, 14: 36.123, 15: 37.697,
+        16: 39.252, 17: 40.790, 18: 42.312, 19: 43.820, 20: 45.315
+      },
       // Alpha = 0.01 (99% confidence)
       0.01: {
         1: 6.635, 2: 9.210, 3: 11.345, 4: 13.277, 5: 15.086,
@@ -398,37 +408,50 @@ export class App implements AfterViewInit {
         11: 17.275, 12: 18.549, 13: 19.812, 14: 21.064, 15: 22.307,
         16: 23.542, 17: 24.769, 18: 25.989, 19: 27.204, 20: 28.412,
         25: 34.382, 30: 40.256
+      },
+      // Alpha = 0.20 (80% confidence)
+      0.20: {
+        1: 1.642, 2: 3.219, 3: 4.642, 4: 5.989, 5: 7.289,
+        6: 8.558, 7: 9.803, 8: 11.030, 9: 12.242, 10: 13.442,
+        11: 14.631, 12: 15.812, 13: 16.985, 14: 18.151, 15: 19.311,
+        16: 20.465, 17: 21.615, 18: 22.760, 19: 23.900, 20: 25.038
       }
     };
     
     // Seleccionar la tabla más cercana al alpha dado
     let selectedAlpha = 0.05;
-    if (alpha <= 0.01) {
-      selectedAlpha = 0.01;
-    } else if (alpha <= 0.05) {
-      selectedAlpha = 0.05;
-    } else {
-      selectedAlpha = 0.10;
+    const alphas = [0.001, 0.01, 0.05, 0.10, 0.20];
+    let minDiff = Math.abs(alpha - 0.05);
+    
+    for (const a of alphas) {
+      const diff = Math.abs(alpha - a);
+      if (diff < minDiff) {
+        minDiff = diff;
+        selectedAlpha = a;
+      }
     }
     
     const table = chiSquareTables[selectedAlpha];
     
-    if (table[df]) {
+    if (table && table[df]) {
       return table[df];
     }
     
     // Approximation for large df using Wilson-Hilferty transformation
-    const z = this.getZValue(alpha);
+    const z = this.getZValueForAlpha(alpha);
     return df * Math.pow(1 - (2 / (9 * df)) + z * Math.sqrt(2 / (9 * df)), 3);
   }
   
   /**
-   * Get Z value for different alpha levels (two-tailed)
+   * Get Z value for a given alpha level (two-tailed)
    */
-  getZValue(alpha: number): number {
-    if (alpha <= 0.01) return 2.576;  // 99% confidence
-    if (alpha <= 0.05) return 1.96;   // 95% confidence
-    if (alpha <= 0.10) return 1.645;  // 90% confidence
+  getZValueForAlpha(alpha: number): number {
+    // Aproximación usando valores conocidos
+    if (alpha <= 0.001) return 3.291;  // 99.9% confidence
+    if (alpha <= 0.01) return 2.576;   // 99% confidence
+    if (alpha <= 0.05) return 1.96;    // 95% confidence
+    if (alpha <= 0.10) return 1.645;   // 90% confidence
+    if (alpha <= 0.20) return 1.282;   // 80% confidence
     return 1.96; // Default
   }
 
