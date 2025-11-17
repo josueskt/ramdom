@@ -39,6 +39,16 @@
           <input formControlName="N" type="number" class="border p-2 rounded w-full" placeholder="Auto">
         </div>
 
+        <div class="form-group">
+          <label class="block font-semibold mb-1">α (nivel de significancia):</label>
+          <select formControlName="alpha" class="border p-2 rounded w-full bg-white">
+            <option value="0.01">0.01 (99% confianza)</option>
+            <option value="0.05" selected>0.05 (95% confianza)</option>
+            <option value="0.10">0.10 (90% confianza)</option>
+          </select>
+          <p class="text-xs text-gray-500 mt-1">Para la prueba Chi-cuadrado de uniformidad</p>
+        </div>
+
         <div class="flex flex-col gap-2 mt-4">
           <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded font-semibold transition">
             Generar
@@ -88,13 +98,15 @@
               <h4 class="test-title">Prueba de Independencia</h4>
             </div>
             <div class="test-details">
-              <p><strong>Método:</strong> Coeficiente de Correlación de Pearson</p>
-              <p><strong>Correlación:</strong> {{ validationResults.independenceTest.correlation.toFixed(6) }}</p>
-              <p><strong>Umbral:</strong> &lt; {{ validationResults.independenceTest.threshold }}</p>
+              <p><strong>Método:</strong> Corridas Arriba y Abajo de la Media</p>
+              <p><strong>Corridas observadas:</strong> {{ validationResults.independenceTest.runs }}</p>
+              <p><strong>Corridas esperadas:</strong> {{ validationResults.independenceTest.expectedRuns.toFixed(2) }}</p>
+              <p><strong>Límite inferior:</strong> {{ validationResults.independenceTest.lowerLimit.toFixed(2) }}</p>
+              <p><strong>Límite superior:</strong> {{ validationResults.independenceTest.upperLimit.toFixed(2) }}</p>
               <p class="test-result">
                 {{ validationResults.independenceTest.passed ? 
-                   '✓ Números independientes' : 
-                   '✗ Correlación significativa detectada' }}
+                   '✓ Números independientes (dentro del intervalo de confianza)' : 
+                   '✗ Números no independientes (fuera del intervalo de confianza)' }}
               </p>
             </div>
           </div>
@@ -107,6 +119,7 @@
             </div>
             <div class="test-details">
               <p><strong>Método:</strong> Prueba Chi-cuadrado (χ²)</p>
+              <p><strong>Nivel de significancia (α):</strong> {{ validationResults.uniformityTest.alpha }} ({{ (1 - validationResults.uniformityTest.alpha) * 100 }}% confianza)</p>
               <p><strong>χ² calculado:</strong> {{ validationResults.uniformityTest.chiSquare.toFixed(4) }}</p>
               <p><strong>χ² crítico:</strong> {{ validationResults.uniformityTest.criticalValue.toFixed(4) }}</p>
               <p><strong>Grados de libertad:</strong> {{ validationResults.uniformityTest.degreesOfFreedom }}</p>
