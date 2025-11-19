@@ -30,6 +30,8 @@ export class App implements AfterViewInit {
   validationResults = {
     independenceTest: { passed: false, runs: 0, expectedRuns: 0, lowerLimit: 0, upperLimit: 0 },
     uniformityTest: { passed: false, chiSquare: 0, criticalValue: 0, degreesOfFreedom: 0, alpha: 0.05 },
+    meanTest: { passed: false, mean: 0, expectedMean: 0.5, lowerLimit: 0, upperLimit: 0 },
+    varianceTest: { passed: false, variance: 0, expectedVariance: 1/12, lowerLimit: 0, upperLimit: 0 },
     overallValid: false
   };
   testsPerformed: boolean = false;
@@ -158,6 +160,8 @@ export class App implements AfterViewInit {
     this.validationResults = {
       independenceTest: { passed: false, runs: 0, expectedRuns: 0, lowerLimit: 0, upperLimit: 0 },
       uniformityTest: { passed: false, chiSquare: 0, criticalValue: 0, degreesOfFreedom: 0, alpha: 0.05 },
+      meanTest: { passed: false, mean: 0, expectedMean: 0.5, lowerLimit: 0, upperLimit: 0 },
+      varianceTest: { passed: false, variance: 0, expectedVariance: 1/12, lowerLimit: 0, upperLimit: 0 },
       overallValid: false
     };
     
@@ -269,10 +273,18 @@ export class App implements AfterViewInit {
     // Test 2: Uniformity Test (Chi-Square)
     this.validationResults.uniformityTest = this.uniformityTest();
     
+    // Test 3: Mean Test
+    this.validationResults.meanTest = this.meanTest();
+    
+    // Test 4: Variance Test
+    this.validationResults.varianceTest = this.varianceTest();
+    
     // Overall validation
     this.validationResults.overallValid = 
       this.validationResults.independenceTest.passed && 
-      this.validationResults.uniformityTest.passed;
+      this.validationResults.uniformityTest.passed &&
+      this.validationResults.meanTest.passed &&
+      this.validationResults.varianceTest.passed;
   }
 
   /**
@@ -368,6 +380,83 @@ export class App implements AfterViewInit {
       criticalValue: chiSquareCritical,
       degreesOfFreedom: degreesOfFreedom,
       alpha: alpha
+    };
+  }
+
+  /**
+   * Mean Test: Verifies if the mean of generated numbers is close to 0.5
+   * For uniform distribution U(0,1), theoretical mean = 0.5
+   */
+  meanTest(): { passed: boolean, mean: number, expectedMean: number, lowerLimit: number, upperLimit: number } {
+    const values = this.results.map(r => r.normalized);
+    const n = values.length;
+    
+    // Calculate sample mean
+    const mean = values.reduce((sum, val) => sum + val, 0) / n;
+    
+    // Expected mean for U(0,1)
+    const expectedMean = 0.5;
+    
+    // Standard error of the mean: σ/√n where σ² = 1/12 for U(0,1)
+    const theoreticalVariance = 1 / 12;
+    const standardError = Math.sqrt(theoreticalVariance / n);
+    
+    // Confidence interval using Z-value for selected alpha
+    const z = this.getZValueForAlpha(this.selectedAlpha);
+    const lowerLimit = expectedMean - z * standardError;
+    const upperLimit = expectedMean + z * standardError;
+    
+    // Test passes if sample mean falls within confidence interval
+    const passed = mean >= lowerLimit && mean <= upperLimit;
+    
+    return {
+      passed: passed,
+      mean: mean,
+      expectedMean: expectedMean,
+      lowerLimit: lowerLimit,
+      upperLimit: upperLimit
+    };
+  }
+
+  /**
+   * Variance Test: Verifies if the variance of generated numbers is close to 1/12
+   * For uniform distribution U(0,1), theoretical variance = 1/12 ≈ 0.0833
+   */
+  varianceTest(): { passed: boolean, variance: number, expectedVariance: number, lowerLimit: number, upperLimit: number } {
+    const values = this.results.map(r => r.normalized);
+    const n = values.length;
+    
+    // Calculate sample mean
+    const mean = values.reduce((sum, val) => sum + val, 0) / n;
+    
+    // Calculate sample variance
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (n - 1);
+    
+    // Expected variance for U(0,1)
+    const expectedVariance = 1 / 12;
+    
+    // Using chi-square distribution for variance test
+    // (n-1)s²/σ² follows chi-square distribution with (n-1) degrees of freedom
+    const degreesOfFreedom = n - 1;
+    
+    // Critical values from chi-square distribution
+    const alpha = this.selectedAlpha;
+    const chiSquareLower = this.getChiSquareCriticalValue(degreesOfFreedom, 1 - alpha/2);
+    const chiSquareUpper = this.getChiSquareCriticalValue(degreesOfFreedom, alpha/2);
+    
+    // Confidence interval for variance
+    const lowerLimit = (degreesOfFreedom * expectedVariance) / chiSquareLower;
+    const upperLimit = (degreesOfFreedom * expectedVariance) / chiSquareUpper;
+    
+    // Test passes if sample variance falls within confidence interval
+    const passed = variance >= lowerLimit && variance <= upperLimit;
+    
+    return {
+      passed: passed,
+      variance: variance,
+      expectedVariance: expectedVariance,
+      lowerLimit: lowerLimit,
+      upperLimit: upperLimit
     };
   }
 

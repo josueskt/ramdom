@@ -127,6 +127,44 @@
               </p>
             </div>
           </div>
+
+          <!-- Prueba de Media -->
+          <div class="test-item" [ngClass]="validationResults.meanTest.passed ? 'test-passed' : 'test-failed'">
+            <div class="test-header">
+              <span class="test-icon">{{ validationResults.meanTest.passed ? '✓' : '✗' }}</span>
+              <h4 class="test-title">Prueba de Media</h4>
+            </div>
+            <div class="test-details">
+              <p><strong>Media observada:</strong> {{ validationResults.meanTest.mean.toFixed(6) }}</p>
+              <p><strong>Media esperada:</strong> {{ validationResults.meanTest.expectedMean.toFixed(6) }}</p>
+              <p><strong>Límite inferior:</strong> {{ validationResults.meanTest.lowerLimit.toFixed(6) }}</p>
+              <p><strong>Límite superior:</strong> {{ validationResults.meanTest.upperLimit.toFixed(6) }}</p>
+              <p class="test-result">
+                {{ validationResults.meanTest.passed ? 
+                   '✓ Media dentro del intervalo de confianza' : 
+                   '✗ Media fuera del intervalo de confianza' }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Prueba de Varianza -->
+          <div class="test-item" [ngClass]="validationResults.varianceTest.passed ? 'test-passed' : 'test-failed'">
+            <div class="test-header">
+              <span class="test-icon">{{ validationResults.varianceTest.passed ? '✓' : '✗' }}</span>
+              <h4 class="test-title">Prueba de Varianza</h4>
+            </div>
+            <div class="test-details">
+              <p><strong>Varianza observada:</strong> {{ validationResults.varianceTest.variance.toFixed(6) }}</p>
+              <p><strong>Varianza esperada:</strong> {{ validationResults.varianceTest.expectedVariance.toFixed(6) }}</p>
+              <p><strong>Límite inferior:</strong> {{ validationResults.varianceTest.lowerLimit.toFixed(6) }}</p>
+              <p><strong>Límite superior:</strong> {{ validationResults.varianceTest.upperLimit.toFixed(6) }}</p>
+              <p class="test-result">
+                {{ validationResults.varianceTest.passed ? 
+                   '✓ Varianza dentro del intervalo de confianza' : 
+                   '✗ Varianza fuera del intervalo de confianza' }}
+              </p>
+            </div>
+          </div>
         </div>
 
         <!-- Resultado General -->
